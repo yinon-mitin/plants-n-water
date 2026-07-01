@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.PlantsNWater" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">#F7FAF2</item>
+    </style>
+</resources>

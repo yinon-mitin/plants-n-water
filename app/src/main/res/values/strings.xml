@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Plants N Water</string>
+    <string name="water_plant">Water plant</string>
+    <string name="mark_watered">Mark watered</string>
+    <string name="remind_later">Remind later</string>
+    <string name="notification_channel_watering">Watering reminders</string>
+    <string name="notification_channel_watering_description">Local reminders for plant watering schedules.</string>
+</resources>
