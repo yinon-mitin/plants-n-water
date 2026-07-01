@@ -1,11 +1,11 @@
 package dev.yinon.plantsnwater.ui
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -16,12 +16,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import dev.yinon.plantsnwater.R
 import dev.yinon.plantsnwater.ui.screens.AddPlantScreen
 import dev.yinon.plantsnwater.ui.screens.CalendarScreen
 import dev.yinon.plantsnwater.ui.screens.HomeScreen
@@ -59,9 +61,15 @@ fun PlantsNWaterApp() {
                 topLevel.forEach { route ->
                     val icon = when (route) {
                         Route.Home -> Icons.Default.Home
-                        Route.Plants -> Icons.Default.List
+                        Route.Plants -> Icons.AutoMirrored.Filled.List
                         Route.Calendar -> Icons.Default.DateRange
                         else -> Icons.Default.Settings
+                    }
+                    val label = when (route) {
+                        Route.Home -> stringResource(R.string.nav_home)
+                        Route.Plants -> stringResource(R.string.nav_plants)
+                        Route.Calendar -> stringResource(R.string.nav_calendar)
+                        else -> stringResource(R.string.nav_settings)
                     }
                     NavigationBarItem(
                         selected = currentRoute == route.value,
@@ -72,7 +80,7 @@ fun PlantsNWaterApp() {
                             }
                         },
                         icon = { Icon(icon, contentDescription = null) },
-                        label = { Text(route.value.replaceFirstChar { it.uppercase() }) }
+                        label = { Text(label) }
                     )
                 }
             }
@@ -80,7 +88,7 @@ fun PlantsNWaterApp() {
         floatingActionButton = {
             if (currentRoute == Route.Home.value || currentRoute == Route.Plants.value) {
                 FloatingActionButton(onClick = { navController.navigate(Route.AddPlant.value) }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add plant")
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_plant))
                 }
             }
         }

@@ -33,11 +33,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import dev.yinon.plantsnwater.R
 import dev.yinon.plantsnwater.data.local.GrowthStage
 import dev.yinon.plantsnwater.data.local.PendingPhotoCapture
 import dev.yinon.plantsnwater.data.local.PlantPhotoEntity
@@ -69,7 +71,7 @@ fun PhotoTimelineScreen(plantId: Long) {
             pendingPhoto = PendingPhotoSource.Camera(capture.localReference)
         } else {
             capture?.let { viewModel.discardCapturedPhoto(it.localReference) }
-            message = "Camera cancelled."
+            message = context.getString(R.string.camera_cancelled)
         }
     }
 
@@ -81,13 +83,13 @@ fun PhotoTimelineScreen(plantId: Long) {
                 cameraLauncher.launch(capture.contentUri)
             }
         } else {
-            message = "Camera permission denied. You can still choose an existing photo."
+            message = context.getString(R.string.camera_denied)
         }
     }
 
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         if (uri == null) {
-            message = "Gallery selection cancelled."
+            message = context.getString(R.string.gallery_cancelled)
         } else {
             pendingPhoto = PendingPhotoSource.Gallery(uri)
         }
@@ -108,13 +110,13 @@ fun PhotoTimelineScreen(plantId: Long) {
     LazyColumn {
         item {
             ScreenColumn {
-                SectionTitle(state.plant?.let { "${it.name} photos" } ?: "Photo timeline")
+                SectionTitle(state.plant?.let { stringResource(R.string.photos_for_plant, it.name) } ?: stringResource(R.string.photo_timeline))
                 Text(
-                    "Track growth with local photos. Photos stay on this device unless you export them.",
+                    stringResource(R.string.photo_privacy_note),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = ::startCamera) { Text("Take photo") }
+                    Button(onClick = ::startCamera) { Text(stringResource(R.string.take_photo)) }
                     OutlinedButton(
                         onClick = {
                             galleryLauncher.launch(
@@ -122,14 +124,14 @@ fun PhotoTimelineScreen(plantId: Long) {
                             )
                         }
                     ) {
-                        Text("Choose photo")
+                        Text(stringResource(R.string.choose_photo))
                     }
                 }
                 message?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 if (state.photos.isEmpty()) {
                     EmptyState(
-                        "No growth photos yet",
-                        "Add photos from the camera or gallery to build this plant's timeline."
+                        stringResource(R.string.no_growth_photos),
+                        stringResource(R.string.no_growth_photos_body)
                     )
                 }
             }
@@ -150,7 +152,7 @@ fun PhotoTimelineScreen(plantId: Long) {
 
     pendingPhoto?.let { source ->
         PhotoMetadataDialog(
-            title = "Add photo details",
+            title = stringResource(R.string.add_photo_details),
             initialCreatedAt = Instant.now().toEpochMilli(),
             initialNote = "",
             initialGrowthStage = null,
@@ -183,7 +185,7 @@ fun PhotoTimelineScreen(plantId: Long) {
 
     editingPhoto?.let { photo ->
         PhotoMetadataDialog(
-            title = "Edit photo details",
+            title = stringResource(R.string.edit_photo_details),
             initialCreatedAt = photo.createdAt,
             initialNote = photo.note.orEmpty(),
             initialGrowthStage = photo.growthStage,
@@ -200,13 +202,13 @@ fun PhotoTimelineScreen(plantId: Long) {
         AlertDialog(
             onDismissRequest = { previewPhoto = null },
             confirmButton = {
-                TextButton(onClick = { previewPhoto = null }) { Text("Close") }
+                TextButton(onClick = { previewPhoto = null }) { Text(stringResource(R.string.close)) }
             },
             title = { Text(photo.createdAt.formatDate()) },
             text = {
                 AsyncImage(
                     model = viewModel.photoUri(photo),
-                    contentDescription = "Photo from ${photo.createdAt.formatDate()}",
+                    contentDescription = stringResource(R.string.photo_from_date, photo.createdAt.formatDate()),
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 520.dp),
@@ -232,7 +234,7 @@ private fun PhotoTimelineCard(
         ) {
             AsyncImage(
                 model = imageUri,
-                contentDescription = "Plant photo from ${photo.createdAt.formatDate()}",
+                contentDescription = stringResource(R.string.photo_from_date, photo.createdAt.formatDate()),
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 180.dp, max = 280.dp)
@@ -240,12 +242,12 @@ private fun PhotoTimelineCard(
                 contentScale = ContentScale.Crop
             )
             Text(photo.createdAt.formatDate(), style = MaterialTheme.typography.titleMedium)
-            photo.stageLabel()?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            photo.stageLabelText()?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             photo.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onOpen) { Text("Preview") }
-                OutlinedButton(onClick = onEdit) { Text("Edit") }
-                TextButton(onClick = onDelete) { Text("Delete") }
+                OutlinedButton(onClick = onOpen) { Text(stringResource(R.string.preview)) }
+                OutlinedButton(onClick = onEdit) { Text(stringResource(R.string.edit)) }
+                TextButton(onClick = onDelete) { Text(stringResource(R.string.delete)) }
             }
         }
     }
@@ -265,6 +267,7 @@ private fun PhotoMetadataDialog(
     var note by remember { mutableStateOf(initialNote) }
     var growthStage by remember { mutableStateOf(initialGrowthStage) }
     var customStage by remember { mutableStateOf(initialCustomStage) }
+    var showDatePicker by remember { mutableStateOf(false) }
     val parsedDate = remember(dateText) { dateText.toEpochMillisOrNull() }
 
     AlertDialog(
@@ -275,26 +278,29 @@ private fun PhotoMetadataDialog(
                 OutlinedTextField(
                     value = dateText,
                     onValueChange = { dateText = it },
-                    label = { Text("Date") },
-                    supportingText = { Text("Use YYYY-MM-DD") },
+                    label = { Text(stringResource(R.string.date)) },
+                    supportingText = { Text(stringResource(R.string.use_yyyy_mm_dd)) },
                     isError = parsedDate == null,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                OutlinedButton(onClick = { showDatePicker = true }) {
+                    Text(stringResource(R.string.change_date))
+                }
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("Note") },
+                    label = { Text(stringResource(R.string.note)) },
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Text("Growth stage", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.growth_stage), style = MaterialTheme.typography.labelLarge)
                 GrowthStageChips(selected = growthStage, onSelected = { growthStage = it })
                 if (growthStage == GrowthStage.Custom) {
                     OutlinedTextField(
                         value = customStage,
                         onValueChange = { customStage = it },
-                        label = { Text("Custom stage") },
+                        label = { Text(stringResource(R.string.custom_stage)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -302,7 +308,7 @@ private fun PhotoMetadataDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         },
         confirmButton = {
             Button(
@@ -311,10 +317,18 @@ private fun PhotoMetadataDialog(
                     onSave(parsedDate ?: initialCreatedAt, note, growthStage, customStage)
                 }
             ) {
-                Text("Save")
+                Text(stringResource(R.string.save))
             }
         }
     )
+
+    if (showDatePicker) {
+        LocalDatePickerDialog(
+            initialDate = parsedDate?.toLocalDate() ?: LocalDate.now(),
+            onDismiss = { showDatePicker = false },
+            onDateSelected = { dateText = it.toString() }
+        )
+    }
 }
 
 @Composable
@@ -329,7 +343,7 @@ private fun GrowthStageChips(
                     FilterChip(
                         selected = selected == stage,
                         onClick = { onSelected(stage) },
-                        label = { Text(stage?.label() ?: "None") }
+                        label = { Text(stage?.labelText() ?: stringResource(R.string.none)) }
                     )
                 }
             }
@@ -342,18 +356,20 @@ private sealed interface PendingPhotoSource {
     data class Gallery(val uri: Uri) : PendingPhotoSource
 }
 
-private fun PlantPhotoEntity.stageLabel(): String? =
-    if (growthStage == GrowthStage.Custom) customGrowthStage?.takeIf { it.isNotBlank() } else growthStage?.label()
+@Composable
+private fun PlantPhotoEntity.stageLabelText(): String? =
+    if (growthStage == GrowthStage.Custom) customGrowthStage?.takeIf { it.isNotBlank() } else growthStage?.labelText()
 
-private fun GrowthStage.label(): String = when (this) {
-    GrowthStage.Seed -> "Seed"
-    GrowthStage.Sprout -> "Sprout"
-    GrowthStage.YoungPlant -> "Young plant"
-    GrowthStage.MaturePlant -> "Mature plant"
-    GrowthStage.Flowering -> "Flowering"
-    GrowthStage.Fruiting -> "Fruiting"
-    GrowthStage.Recovering -> "Recovering"
-    GrowthStage.Custom -> "Custom"
+@Composable
+private fun GrowthStage.labelText(): String = when (this) {
+    GrowthStage.Seed -> stringResource(R.string.stage_seed)
+    GrowthStage.Sprout -> stringResource(R.string.stage_sprout)
+    GrowthStage.YoungPlant -> stringResource(R.string.stage_young_plant)
+    GrowthStage.MaturePlant -> stringResource(R.string.stage_mature_plant)
+    GrowthStage.Flowering -> stringResource(R.string.stage_flowering)
+    GrowthStage.Fruiting -> stringResource(R.string.stage_fruiting)
+    GrowthStage.Recovering -> stringResource(R.string.stage_recovering)
+    GrowthStage.Custom -> stringResource(R.string.stage_custom)
 }
 
 private fun Long.toDateInput(): String =

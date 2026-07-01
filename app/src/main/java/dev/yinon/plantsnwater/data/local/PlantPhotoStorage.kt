@@ -6,6 +6,8 @@ import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
 import java.time.Clock
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +49,25 @@ class PlantPhotoStorage(
 
     suspend fun delete(localReference: String) = withContext(Dispatchers.IO) {
         File(photoDir, localReference).delete()
+    }
+
+    suspend fun writePhoto(localReference: String, input: InputStream) = withContext(Dispatchers.IO) {
+        val target = File(photoDir, localReference)
+        target.outputStream().use { output -> input.copyTo(output) }
+    }
+
+    suspend fun readPhoto(localReference: String, block: (InputStream) -> Unit) = withContext(Dispatchers.IO) {
+        File(photoDir, localReference).inputStream().use(block)
+    }
+
+    suspend fun copyPhotoTo(localReference: String, output: OutputStream) = withContext(Dispatchers.IO) {
+        File(photoDir, localReference).takeIf { it.exists() }?.inputStream()?.use { input ->
+            input.copyTo(output)
+        }
+    }
+
+    suspend fun clearAll() = withContext(Dispatchers.IO) {
+        photoDir.listFiles()?.forEach { it.delete() }
     }
 
     private fun newPhotoFile(extension: String): File {

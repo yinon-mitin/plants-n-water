@@ -19,12 +19,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.yinon.plantsnwater.R
 import dev.yinon.plantsnwater.data.local.PlantStatus
 import dev.yinon.plantsnwater.ui.AddPlantViewModel
 import dev.yinon.plantsnwater.ui.LocalAppContainer
 import dev.yinon.plantsnwater.ui.PlantViewModelFactory
+import java.time.LocalDate
 
 @Composable
 fun AddPlantScreen(onDone: (Long) -> Unit) {
@@ -38,45 +41,60 @@ fun AddPlantScreen(onDone: (Long) -> Unit) {
     var care by remember { mutableStateOf("") }
     var status by remember { mutableStateOf(PlantStatus.Healthy) }
     var advanced by remember { mutableStateOf(false) }
+    var lastWatered by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
+    var showLastWateredPicker by remember { mutableStateOf(false) }
 
     ScreenColumn {
         Column(
             modifier = Modifier.verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            SectionTitle("Add plant")
+            SectionTitle(stringResource(R.string.add_plant))
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Plant name") },
+                label = { Text(stringResource(R.string.plant_name)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
                 value = interval.toString(),
                 onValueChange = { interval = it.toIntOrNull()?.coerceAtLeast(1) ?: interval },
-                label = { Text("Water every N days") },
+                label = { Text(stringResource(R.string.water_every_n_days)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(1, 2, 3, 7).forEach { days ->
+                listOf(1, 2, 3, 7, 14).forEach { days ->
                     FilterChip(
                         selected = interval == days,
                         onClick = { interval = days },
-                        label = { Text("$days d") }
+                        label = { Text(stringResource(R.string.interval_preset_short, days)) }
                     )
                 }
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = lastWatered != null,
+                    onClick = { lastWatered = LocalDate.now() },
+                    label = { Text(lastWatered?.formatDateInput() ?: stringResource(R.string.last_watered_not_sure)) }
+                )
+                TextButton(onClick = { showLastWateredPicker = true }) {
+                    Text(stringResource(R.string.change_date))
+                }
+                TextButton(onClick = { lastWatered = null }) {
+                    Text(stringResource(R.string.last_watered_not_sure))
+                }
+            }
             TextButton(onClick = { advanced = !advanced }) {
-                Text(if (advanced) "Hide advanced fields" else "Advanced fields")
+                Text(if (advanced) stringResource(R.string.hide_advanced_fields) else stringResource(R.string.advanced_fields))
             }
             AnimatedVisibility(advanced) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(species, { species = it }, label = { Text("Species or type") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(location, { location = it }, label = { Text("Location") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(notes, { notes = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-                    OutlinedTextField(care, { care = it }, label = { Text("Care instructions") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                    OutlinedTextField(species, { species = it }, label = { Text(stringResource(R.string.species_or_type)) }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(location, { location = it }, label = { Text(stringResource(R.string.location)) }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(notes, { notes = it }, label = { Text(stringResource(R.string.notes)) }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                    OutlinedTextField(care, { care = it }, label = { Text(stringResource(R.string.care_instructions)) }, modifier = Modifier.fillMaxWidth(), minLines = 2)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         PlantStatus.entries.take(3).forEach {
                             FilterChip(selected = status == it, onClick = { status = it }, label = { Text(it.name) })
@@ -86,13 +104,33 @@ fun AddPlantScreen(onDone: (Long) -> Unit) {
             }
             Button(
                 onClick = {
-                    viewModel.addPlant(name, interval, species, location, notes, care, status, onDone)
+                    viewModel.addPlant(
+                        name,
+                        interval,
+                        species,
+                        location,
+                        notes,
+                        care,
+                        status,
+                        lastWatered?.startOfDayMillis(),
+                        onDone
+                    )
                 },
                 enabled = name.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Create plant")
+                Text(stringResource(R.string.create_plant))
             }
         }
     }
+
+    if (showLastWateredPicker) {
+        LocalDatePickerDialog(
+            initialDate = lastWatered ?: LocalDate.now(),
+            onDismiss = { showLastWateredPicker = false },
+            onDateSelected = { lastWatered = it }
+        )
+    }
 }
+
+private fun LocalDate.formatDateInput(): String = toString()

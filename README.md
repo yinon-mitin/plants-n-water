@@ -13,6 +13,9 @@ This repository contains the initial serious open-source Android implementation.
 - Plant photo capture from camera and image selection from the Android photo picker
 - Chronological photo timeline with optional notes, dates, and flexible growth stage labels
 - Latest plant photo thumbnails in plant cards
+- Visual monthly watering calendar
+- ZIP backup export/import through Android’s Storage Access Framework
+- English and Russian UI
 - Room-backed local storage for plants, watering events, notes, photos, and tags
 - Watering schedule calculation with overdue/upcoming state
 - Mark as watered, skip, postpone, archive, and delete flows at the architecture level
@@ -46,6 +49,7 @@ Build from the command line:
 
 ```bash
 ./gradlew assembleDebug
+./gradlew assembleRelease
 ```
 
 If the Gradle wrapper JAR is not present in your checkout, install Gradle locally once and run:
@@ -54,6 +58,55 @@ If the Gradle wrapper JAR is not present in your checkout, install Gradle locall
 gradle wrapper --gradle-version 8.10.2
 ./gradlew assembleDebug
 ```
+
+## CI and Signed Releases
+
+GitHub Actions includes:
+
+- `CI`: runs on pushes to `main`/`master`, pull requests, and manual dispatch. It runs tests, builds debug and release APKs, and uploads APK artifacts from `app/build/outputs/apk/`.
+- `Signed Release APK`: runs on tags matching `v*.*.*` and manual dispatch. It decodes a release keystore from secrets, runs tests, builds a signed release APK, and uploads it as an artifact.
+
+Required GitHub Secrets for signed releases:
+
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+
+Create a local release keystore:
+
+```bash
+keytool -genkeypair -v \
+  -keystore release-keystore.jks \
+  -alias plants-n-water \
+  -keyalg RSA \
+  -keysize 4096 \
+  -validity 10000
+```
+
+Base64 encode it for GitHub Secrets:
+
+```bash
+base64 -i release-keystore.jks | pbcopy
+```
+
+For local signed release builds, create an untracked `keystore.properties` file:
+
+```properties
+storeFile=release-keystore.jks
+storePassword=...
+keyAlias=plants-n-water
+keyPassword=...
+```
+
+Trigger a signed release build by pushing a tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The signed release workflow can also be run manually from the GitHub Actions tab after the secrets are configured.
 
 ## Privacy
 

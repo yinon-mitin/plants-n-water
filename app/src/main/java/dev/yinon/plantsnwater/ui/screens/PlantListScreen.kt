@@ -4,8 +4,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.yinon.plantsnwater.R
 import dev.yinon.plantsnwater.ui.LocalAppContainer
 import dev.yinon.plantsnwater.ui.PlantListViewModel
 import dev.yinon.plantsnwater.ui.PlantViewModelFactory
@@ -19,9 +21,9 @@ fun PlantListScreen(onPlantClick: (Long) -> Unit) {
     LazyColumn {
         item {
             ScreenColumn {
-                SectionTitle("Plants")
+                SectionTitle(stringResource(R.string.plants))
                 if (state.plants.isEmpty()) {
-                    EmptyState("Add your first plant", "A plant only needs a name and watering interval.")
+                    EmptyState(stringResource(R.string.add_first_plant), stringResource(R.string.add_first_plant_body))
                 }
             }
         }

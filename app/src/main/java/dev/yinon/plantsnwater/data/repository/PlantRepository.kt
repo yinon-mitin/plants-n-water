@@ -43,6 +43,7 @@ class PlantRepository(
     suspend fun addPlant(
         name: String,
         wateringIntervalDays: Int,
+        lastWateredAt: Long? = Instant.now().toEpochMilli(),
         species: String? = null,
         location: String? = null,
         notes: String? = null,
@@ -53,7 +54,8 @@ class PlantRepository(
         customReminderMinute: Int? = null
     ): Long {
         val now = Instant.now()
-        val next = WateringSchedule.nextWateringDate(null, now, wateringIntervalDays)
+        val lastWateredInstant = lastWateredAt?.let(Instant::ofEpochMilli)
+        val next = WateringSchedule.nextWateringDate(lastWateredInstant, now, wateringIntervalDays)
             .atStartOfDay(ZoneId.systemDefault())
             .toInstant()
             .toEpochMilli()
@@ -67,6 +69,7 @@ class PlantRepository(
                 createdAt = now.toEpochMilli(),
                 updatedAt = now.toEpochMilli(),
                 wateringIntervalDays = wateringIntervalDays,
+                lastWateredAt = lastWateredAt,
                 nextWateringAt = next,
                 status = status,
                 notificationEnabled = notificationEnabled,
@@ -78,6 +81,39 @@ class PlantRepository(
 
     suspend fun updatePlant(plant: PlantEntity) {
         dao.updatePlant(plant.copy(updatedAt = Instant.now().toEpochMilli()))
+    }
+
+    suspend fun updatePlantDetails(
+        plantId: Long,
+        name: String,
+        wateringIntervalDays: Int,
+        lastWateredAt: Long?,
+        species: String?,
+        location: String?,
+        notes: String?,
+        careInstructions: String?,
+        status: PlantStatus
+    ) {
+        val plant = dao.getPlant(plantId) ?: return
+        val nextBase = lastWateredAt?.let(Instant::ofEpochMilli) ?: Instant.ofEpochMilli(plant.createdAt)
+        val next = WateringSchedule.nextWateringDate(
+            lastWateredAt = lastWateredAt?.let(Instant::ofEpochMilli),
+            createdAt = nextBase,
+            intervalDays = wateringIntervalDays
+        ).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        updatePlant(
+            plant.copy(
+                name = name.trim(),
+                species = species.clean(),
+                location = location.clean(),
+                notes = notes.clean(),
+                careInstructions = careInstructions.clean(),
+                wateringIntervalDays = wateringIntervalDays,
+                lastWateredAt = lastWateredAt,
+                nextWateringAt = next,
+                status = status
+            )
+        )
     }
 
     suspend fun markWatered(plantId: Long, note: String? = null) {

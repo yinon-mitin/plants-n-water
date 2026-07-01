@@ -21,6 +21,25 @@ class WateringScheduleTest {
     }
 
     @Test
+    fun fourteenDayIntervalIsSupported() {
+        val created = Instant.parse("2026-07-01T08:00:00Z")
+
+        val next = WateringSchedule.nextWateringDate(null, created, 14, zone)
+
+        assertEquals(LocalDate.parse("2026-07-15"), next)
+    }
+
+    @Test
+    fun lastWateredYesterdayWithFiveDayIntervalIsFourDaysFromToday() {
+        val created = Instant.parse("2026-07-01T08:00:00Z")
+        val wateredYesterday = Instant.parse("2026-07-09T10:00:00Z")
+
+        val next = WateringSchedule.nextWateringDate(wateredYesterday, created, 5, zone)
+
+        assertEquals(LocalDate.parse("2026-07-14"), next)
+    }
+
+    @Test
     fun nextWateringDateFallsBackToCreatedDate() {
         val created = Instant.parse("2026-07-01T08:00:00Z")
 

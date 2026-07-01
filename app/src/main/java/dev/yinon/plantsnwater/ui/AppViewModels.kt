@@ -1,13 +1,15 @@
 package dev.yinon.plantsnwater.ui
 
 import android.net.Uri
-import dev.yinon.plantsnwater.data.local.GrowthStage
-import dev.yinon.plantsnwater.data.local.PendingPhotoCapture
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import dev.yinon.plantsnwater.BuildConfig
+import dev.yinon.plantsnwater.R
 import dev.yinon.plantsnwater.core.AppContainer
+import dev.yinon.plantsnwater.data.local.GrowthStage
+import dev.yinon.plantsnwater.data.local.PendingPhotoCapture
 import dev.yinon.plantsnwater.data.local.PlantEntity
 import dev.yinon.plantsnwater.data.local.PlantPhotoEntity
 import dev.yinon.plantsnwater.data.local.PlantStatus
@@ -21,10 +23,11 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 val LocalAppContainer = staticCompositionLocalOf<AppContainer> {
@@ -92,6 +95,7 @@ class AddPlantViewModel(private val container: AppContainer) : ViewModel() {
         notes: String?,
         careInstructions: String?,
         status: PlantStatus,
+        lastWateredAt: Long?,
         onCreated: (Long) -> Unit
     ) {
         if (name.isBlank() || intervalDays < 1) return
@@ -99,6 +103,7 @@ class AddPlantViewModel(private val container: AppContainer) : ViewModel() {
             val id = repository.addPlant(
                 name = name,
                 wateringIntervalDays = intervalDays,
+                lastWateredAt = lastWateredAt,
                 species = species,
                 location = location,
                 notes = notes,
@@ -127,6 +132,29 @@ class PlantDetailViewModel(private val plantId: Long, private val container: App
     fun skip() = updateAndSchedule { repository.skipWatering(plantId) }
     fun postpone() = updateAndSchedule { repository.postponeWatering(plantId) }
     fun addNote(note: String) = viewModelScope.launch { repository.addNote(plantId, note) }
+    fun updatePlant(
+        name: String,
+        intervalDays: Int,
+        lastWateredAt: Long?,
+        species: String?,
+        location: String?,
+        notes: String?,
+        careInstructions: String?,
+        status: PlantStatus
+    ) = viewModelScope.launch {
+        repository.updatePlantDetails(
+            plantId = plantId,
+            name = name,
+            wateringIntervalDays = intervalDays,
+            lastWateredAt = lastWateredAt,
+            species = species,
+            location = location,
+            notes = notes,
+            careInstructions = careInstructions,
+            status = status
+        )
+        repository.getPlant(plantId)?.let { container.notificationScheduler.schedule(it) }
+    }
 
     private fun updateAndSchedule(action: suspend () -> Unit) = viewModelScope.launch {
         action()
@@ -201,17 +229,84 @@ data class PhotoTimelineUiState(
 )
 
 class CalendarViewModel(private val repository: PlantRepository) : ViewModel() {
-    val plants: StateFlow<List<PlantEntity>> = repository.observeActivePlants()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    private val selectedDate = MutableStateFlow(LocalDate.now())
+    private val visibleMonth = MutableStateFlow(LocalDate.now().withDayOfMonth(1))
+
+    val uiState: StateFlow<CalendarUiState> = combine(
+        repository.observeActivePlants(),
+        selectedDate,
+        visibleMonth
+    ) { plants, selected, month ->
+        val byDate = plants.groupBy { it.nextWateringLocalDate() }
+        CalendarUiState(
+            selectedDate = selected,
+            visibleMonth = month,
+            scheduledByDate = byDate,
+            selectedPlants = byDate[selected].orEmpty()
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CalendarUiState())
+
+    fun selectDate(date: LocalDate) {
+        selectedDate.value = date
+        visibleMonth.value = date.withDayOfMonth(1)
+    }
+
+    fun previousMonth() {
+        visibleMonth.update { it.minusMonths(1) }
+    }
+
+    fun nextMonth() {
+        visibleMonth.update { it.plusMonths(1) }
+    }
 }
+
+data class CalendarUiState(
+    val selectedDate: LocalDate = LocalDate.now(),
+    val visibleMonth: LocalDate = LocalDate.now().withDayOfMonth(1),
+    val scheduledByDate: Map<LocalDate, List<PlantEntity>> = emptyMap(),
+    val selectedPlants: List<PlantEntity> = emptyList()
+)
 
 class SettingsViewModel(private val settingsRepository: SettingsRepository) : ViewModel() {
     val settings: StateFlow<AppSettings> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
 
+    val versionName: String = BuildConfig.VERSION_NAME
+
     fun setNotificationsEnabled(enabled: Boolean) =
         viewModelScope.launch { settingsRepository.setNotificationsEnabled(enabled) }
 }
+
+class ImportExportViewModel(private val container: AppContainer) : ViewModel() {
+    private val _uiState = MutableStateFlow(ImportExportUiState())
+    val uiState: StateFlow<ImportExportUiState> = _uiState
+
+    fun exportTo(uri: Uri) = viewModelScope.launch {
+        _uiState.value = ImportExportUiState(isBusy = true)
+        val result = container.backupRepository.exportTo(uri)
+        _uiState.value = if (result.isSuccess) {
+            ImportExportUiState(messageRes = R.string.export_complete)
+        } else {
+            ImportExportUiState(messageRes = R.string.export_failed, detail = result.exceptionOrNull()?.message)
+        }
+    }
+
+    fun importReplacingFrom(uri: Uri) = viewModelScope.launch {
+        _uiState.value = ImportExportUiState(isBusy = true)
+        val result = container.backupRepository.importReplacingFrom(uri)
+        _uiState.value = if (result.isSuccess) {
+            ImportExportUiState(messageRes = R.string.import_complete)
+        } else {
+            ImportExportUiState(messageRes = R.string.import_failed, detail = result.exceptionOrNull()?.message)
+        }
+    }
+}
+
+data class ImportExportUiState(
+    val isBusy: Boolean = false,
+    val messageRes: Int? = null,
+    val detail: String? = null
+)
 
 class PlantViewModelFactory(
     private val container: AppContainer,
@@ -225,6 +320,7 @@ class PlantViewModelFactory(
             AddPlantViewModel::class.java -> AddPlantViewModel(container)
             CalendarViewModel::class.java -> CalendarViewModel(container.plantRepository)
             SettingsViewModel::class.java -> SettingsViewModel(container.settingsRepository)
+            ImportExportViewModel::class.java -> ImportExportViewModel(container)
             PlantDetailViewModel::class.java -> PlantDetailViewModel(requireNotNull(plantId), container)
             PhotoTimelineViewModel::class.java -> PhotoTimelineViewModel(requireNotNull(plantId), container)
             else -> error("Unknown ViewModel $modelClass")

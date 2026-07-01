@@ -4,8 +4,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.yinon.plantsnwater.R
 import dev.yinon.plantsnwater.ui.HomeViewModel
 import dev.yinon.plantsnwater.ui.LocalAppContainer
 import dev.yinon.plantsnwater.ui.PlantViewModelFactory
@@ -19,9 +21,9 @@ fun HomeScreen(onPlantClick: (Long) -> Unit) {
     LazyColumn {
         item {
             ScreenColumn {
-                SectionTitle("Today")
+                SectionTitle(stringResource(R.string.today))
                 if (state.duePlants.isEmpty()) {
-                    EmptyState("Nothing due", "Your plants are on track. Upcoming watering tasks are below.")
+                    EmptyState(stringResource(R.string.nothing_due), stringResource(R.string.nothing_due_body))
                 }
             }
         }
@@ -39,9 +41,9 @@ fun HomeScreen(onPlantClick: (Long) -> Unit) {
         }
         item {
             ScreenColumn {
-                SectionTitle("Upcoming")
+                SectionTitle(stringResource(R.string.upcoming))
                 if (state.upcomingPlants.isEmpty() && state.duePlants.isNotEmpty()) {
-                    EmptyState("No upcoming tasks", "Watered plants will appear here after their next schedule is calculated.")
+                    EmptyState(stringResource(R.string.no_upcoming_tasks), stringResource(R.string.no_upcoming_tasks_body))
                 }
             }
         }

@@ -10,3 +10,6 @@ captures/
 *.aab
 *.ap_
 *.keystore
+*.jks
+keystore.properties
+release-keystore.*
