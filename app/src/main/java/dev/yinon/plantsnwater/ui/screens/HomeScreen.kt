@@ -29,6 +29,7 @@ fun HomeScreen(onPlantClick: (Long) -> Unit) {
             ScreenColumn {
                 PlantCard(
                     plant = plant,
+                    latestPhoto = state.latestPhotos[plant.id],
                     onClick = { onPlantClick(plant.id) },
                     onWatered = { viewModel.markWatered(plant.id) },
                     onSkip = { viewModel.skip(plant.id) },
@@ -46,7 +47,11 @@ fun HomeScreen(onPlantClick: (Long) -> Unit) {
         }
         items(state.upcomingPlants, key = { it.id }) { plant ->
             ScreenColumn {
-                PlantCard(plant = plant, onClick = { onPlantClick(plant.id) })
+                PlantCard(
+                    plant = plant,
+                    latestPhoto = state.latestPhotos[plant.id],
+                    onClick = { onPlantClick(plant.id) }
+                )
             }
         }
     }

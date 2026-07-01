@@ -1,9 +1,12 @@
 package dev.yinon.plantsnwater.data.repository
 
+import android.net.Uri
+import dev.yinon.plantsnwater.data.local.GrowthStage
 import dev.yinon.plantsnwater.data.local.PlantDao
 import dev.yinon.plantsnwater.data.local.PlantEntity
 import dev.yinon.plantsnwater.data.local.PlantNoteEntity
 import dev.yinon.plantsnwater.data.local.PlantPhotoEntity
+import dev.yinon.plantsnwater.data.local.PlantPhotoStorage
 import dev.yinon.plantsnwater.data.local.PlantStatus
 import dev.yinon.plantsnwater.data.local.WateringEventEntity
 import dev.yinon.plantsnwater.data.local.WateringEventStatus
@@ -13,7 +16,10 @@ import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
 
-class PlantRepository(private val dao: PlantDao) {
+class PlantRepository(
+    private val dao: PlantDao,
+    private val photoStorage: PlantPhotoStorage
+) {
     fun observeActivePlants(): Flow<List<PlantEntity>> = dao.observeActivePlants()
 
     fun observeDuePlants(today: LocalDate = LocalDate.now()): Flow<List<PlantEntity>> =
@@ -25,6 +31,8 @@ class PlantRepository(private val dao: PlantDao) {
         dao.observeWateringEvents(plantId)
 
     fun observePhotos(plantId: Long): Flow<List<PlantPhotoEntity>> = dao.observePhotos(plantId)
+
+    fun observeLatestPhotos(): Flow<List<PlantPhotoEntity>> = dao.observeLatestPhotos()
 
     fun observeNotes(plantId: Long): Flow<List<PlantNoteEntity>> = dao.observeNotes(plantId)
 
@@ -143,7 +151,9 @@ class PlantRepository(private val dao: PlantDao) {
     }
 
     suspend fun deletePlant(plantId: Long) {
-        dao.getPlant(plantId)?.let { dao.deletePlant(it) }
+        val plant = dao.getPlant(plantId) ?: return
+        dao.getPhotos(plantId).forEach { photoStorage.delete(it.filePath) }
+        dao.deletePlant(plant)
     }
 
     suspend fun addNote(plantId: Long, note: String) {
@@ -151,7 +161,72 @@ class PlantRepository(private val dao: PlantDao) {
         dao.insertNote(PlantNoteEntity(plantId = plantId, createdAt = Instant.now().toEpochMilli(), note = note.trim()))
     }
 
-    suspend fun addPhoto(photo: PlantPhotoEntity): Long = dao.insertPhoto(photo)
+    suspend fun addPhotoFromUri(
+        plantId: Long,
+        sourceUri: Uri,
+        createdAt: Long,
+        note: String?,
+        growthStage: GrowthStage?,
+        customGrowthStage: String?
+    ): Long {
+        val localReference = photoStorage.copyFromUri(sourceUri)
+        return addPhotoReference(plantId, localReference, createdAt, note, growthStage, customGrowthStage)
+    }
+
+    suspend fun addPhotoReference(
+        plantId: Long,
+        localReference: String,
+        createdAt: Long = Instant.now().toEpochMilli(),
+        note: String? = null,
+        growthStage: GrowthStage? = null,
+        customGrowthStage: String? = null
+    ): Long {
+        val id = dao.insertPhoto(
+            PlantPhotoEntity(
+                plantId = plantId,
+                filePath = localReference,
+                createdAt = createdAt,
+                note = note.clean(),
+                growthStage = growthStage,
+                customGrowthStage = customGrowthStage.clean()
+            )
+        )
+        val plant = dao.getPlant(plantId)
+        if (plant != null && plant.coverPhotoId == null) {
+            dao.updatePlant(plant.copy(coverPhotoId = id, updatedAt = Instant.now().toEpochMilli()))
+        }
+        return id
+    }
+
+    suspend fun updatePhotoMetadata(
+        photoId: Long,
+        createdAt: Long,
+        note: String?,
+        growthStage: GrowthStage?,
+        customGrowthStage: String?
+    ) {
+        val photo = dao.getPhoto(photoId) ?: return
+        dao.updatePhoto(
+            photo.copy(
+                createdAt = createdAt,
+                note = note.clean(),
+                growthStage = growthStage,
+                customGrowthStage = customGrowthStage.clean()
+            )
+        )
+    }
+
+    suspend fun deletePhoto(photoId: Long) {
+        val photo = dao.getPhoto(photoId) ?: return
+        dao.deletePhoto(photo)
+        photoStorage.delete(photo.filePath)
+        val plant = dao.getPlant(photo.plantId)
+        if (plant?.coverPhotoId == photoId) {
+            dao.updatePlant(plant.copy(coverPhotoId = null, updatedAt = Instant.now().toEpochMilli()))
+        }
+    }
+
+    fun photoUri(photo: PlantPhotoEntity): Uri = photoStorage.displayUri(photo.filePath)
 
     suspend fun exportSnapshot(): ExportSnapshot =
         ExportSnapshot(plants = dao.getActivePlants(), wateringEvents = dao.getAllWateringEvents())

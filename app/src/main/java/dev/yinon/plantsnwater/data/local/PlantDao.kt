@@ -50,8 +50,34 @@ interface PlantDao {
     @Query("SELECT * FROM plant_photos WHERE plantId = :plantId ORDER BY createdAt DESC")
     fun observePhotos(plantId: Long): Flow<List<PlantPhotoEntity>>
 
+    @Query("SELECT * FROM plant_photos WHERE plantId = :plantId")
+    suspend fun getPhotos(plantId: Long): List<PlantPhotoEntity>
+
+    @Query(
+        """
+        SELECT * FROM plant_photos
+        WHERE id IN (
+            SELECT latest.id
+            FROM plant_photos AS latest
+            WHERE latest.plantId = plant_photos.plantId
+            ORDER BY latest.createdAt DESC, latest.id DESC
+            LIMIT 1
+        )
+        """
+    )
+    fun observeLatestPhotos(): Flow<List<PlantPhotoEntity>>
+
+    @Query("SELECT * FROM plant_photos WHERE id = :photoId")
+    suspend fun getPhoto(photoId: Long): PlantPhotoEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPhoto(photo: PlantPhotoEntity): Long
+
+    @Update
+    suspend fun updatePhoto(photo: PlantPhotoEntity)
+
+    @Delete
+    suspend fun deletePhoto(photo: PlantPhotoEntity)
 
     @Query("SELECT * FROM plant_notes WHERE plantId = :plantId ORDER BY createdAt DESC")
     fun observeNotes(plantId: Long): Flow<List<PlantNoteEntity>>

@@ -1,13 +1,18 @@
 package dev.yinon.plantsnwater.ui
 
+import android.net.Uri
+import dev.yinon.plantsnwater.data.local.GrowthStage
+import dev.yinon.plantsnwater.data.local.PendingPhotoCapture
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dev.yinon.plantsnwater.core.AppContainer
 import dev.yinon.plantsnwater.data.local.PlantEntity
+import dev.yinon.plantsnwater.data.local.PlantPhotoEntity
 import dev.yinon.plantsnwater.data.local.PlantStatus
 import dev.yinon.plantsnwater.data.local.WateringEventEntity
+import dev.yinon.plantsnwater.data.repository.PlantPhotoCollections
 import dev.yinon.plantsnwater.data.repository.PlantRepository
 import dev.yinon.plantsnwater.domain.WateringSchedule
 import dev.yinon.plantsnwater.settings.AppSettings
@@ -29,12 +34,18 @@ val LocalAppContainer = staticCompositionLocalOf<AppContainer> {
 class HomeViewModel(private val container: AppContainer) : ViewModel() {
     private val repository = container.plantRepository
 
-    val uiState: StateFlow<HomeUiState> = repository.observeActivePlants()
-        .map { plants ->
+    val uiState: StateFlow<HomeUiState> = combine(
+        repository.observeActivePlants(),
+        repository.observeLatestPhotos()
+    ) { plants, latestPhotos ->
             val today = LocalDate.now()
             val due = plants.filter { it.nextWateringLocalDate() <= today }
             val upcoming = plants.filter { it.nextWateringLocalDate() > today }.take(5)
-            HomeUiState(duePlants = due, upcomingPlants = upcoming)
+            HomeUiState(
+                duePlants = due,
+                upcomingPlants = upcoming,
+                latestPhotos = PlantPhotoCollections.latestByPlant(latestPhotos)
+            )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
@@ -50,15 +61,25 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
 
 data class HomeUiState(
     val duePlants: List<PlantEntity> = emptyList(),
-    val upcomingPlants: List<PlantEntity> = emptyList()
+    val upcomingPlants: List<PlantEntity> = emptyList(),
+    val latestPhotos: Map<Long, PlantPhotoEntity> = emptyMap()
 )
 
 class PlantListViewModel(private val repository: PlantRepository) : ViewModel() {
-    val plants: StateFlow<List<PlantEntity>> = repository.observeActivePlants()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val uiState: StateFlow<PlantListUiState> = combine(
+        repository.observeActivePlants(),
+        repository.observeLatestPhotos()
+    ) { plants, latestPhotos ->
+        PlantListUiState(plants, PlantPhotoCollections.latestByPlant(latestPhotos))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlantListUiState())
 
     fun archive(id: Long) = viewModelScope.launch { repository.archivePlant(id) }
 }
+
+data class PlantListUiState(
+    val plants: List<PlantEntity> = emptyList(),
+    val latestPhotos: Map<Long, PlantPhotoEntity> = emptyMap()
+)
 
 class AddPlantViewModel(private val container: AppContainer) : ViewModel() {
     private val repository = container.plantRepository
@@ -120,6 +141,65 @@ data class PlantDetailUiState(
     val notes: List<String> = emptyList()
 )
 
+class PhotoTimelineViewModel(private val plantId: Long, private val container: AppContainer) : ViewModel() {
+    private val repository = container.plantRepository
+
+    val uiState: StateFlow<PhotoTimelineUiState> = combine(
+        repository.observePlant(plantId),
+        repository.observePhotos(plantId)
+    ) { plant, photos ->
+        PhotoTimelineUiState(plant = plant, photos = PlantPhotoCollections.newestFirst(photos))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PhotoTimelineUiState())
+
+    suspend fun prepareCameraCapture(): PendingPhotoCapture =
+        container.photoStorage.createCameraCapture()
+
+    fun addGalleryPhoto(
+        uri: Uri,
+        createdAt: Long,
+        note: String?,
+        growthStage: GrowthStage?,
+        customGrowthStage: String?
+    ) = viewModelScope.launch {
+        repository.addPhotoFromUri(plantId, uri, createdAt, note, growthStage, customGrowthStage)
+    }
+
+    fun addCapturedPhoto(
+        localReference: String,
+        createdAt: Long,
+        note: String?,
+        growthStage: GrowthStage?,
+        customGrowthStage: String?
+    ) = viewModelScope.launch {
+        repository.addPhotoReference(plantId, localReference, createdAt, note, growthStage, customGrowthStage)
+    }
+
+    fun discardCapturedPhoto(localReference: String) = viewModelScope.launch {
+        container.photoStorage.delete(localReference)
+    }
+
+    fun updatePhoto(
+        photoId: Long,
+        createdAt: Long,
+        note: String?,
+        growthStage: GrowthStage?,
+        customGrowthStage: String?
+    ) = viewModelScope.launch {
+        repository.updatePhotoMetadata(photoId, createdAt, note, growthStage, customGrowthStage)
+    }
+
+    fun deletePhoto(photoId: Long) = viewModelScope.launch {
+        repository.deletePhoto(photoId)
+    }
+
+    fun photoUri(photo: PlantPhotoEntity): Uri = repository.photoUri(photo)
+}
+
+data class PhotoTimelineUiState(
+    val plant: PlantEntity? = null,
+    val photos: List<PlantPhotoEntity> = emptyList()
+)
+
 class CalendarViewModel(private val repository: PlantRepository) : ViewModel() {
     val plants: StateFlow<List<PlantEntity>> = repository.observeActivePlants()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -146,6 +226,7 @@ class PlantViewModelFactory(
             CalendarViewModel::class.java -> CalendarViewModel(container.plantRepository)
             SettingsViewModel::class.java -> SettingsViewModel(container.settingsRepository)
             PlantDetailViewModel::class.java -> PlantDetailViewModel(requireNotNull(plantId), container)
+            PhotoTimelineViewModel::class.java -> PhotoTimelineViewModel(requireNotNull(plantId), container)
             else -> error("Unknown ViewModel $modelClass")
         } as T
     }

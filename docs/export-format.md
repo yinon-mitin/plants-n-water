@@ -15,6 +15,8 @@ plants-n-water-backup.zip
 
 JSON-only export is acceptable when the user excludes photos.
 
+The app stores photo binaries in app-private storage and stores generated local photo references in Room. Export should copy only the photo files referenced by `plantPhotos` into `media/plant-photos/`; it should not depend on original camera or gallery URIs.
+
 ## `manifest.json`
 
 ```json
@@ -49,6 +51,7 @@ JSON-only export is acceptable when the user excludes photos.
 - Offer merge or replace.
 - Copy media files into app-private storage.
 - Preserve original timestamps where possible.
+- Avoid preserving unnecessary sensitive image metadata unless the user explicitly requests it in a future feature.
 
 ## Privacy
 

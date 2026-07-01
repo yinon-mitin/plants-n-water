@@ -14,20 +14,24 @@ import dev.yinon.plantsnwater.ui.PlantViewModelFactory
 fun PlantListScreen(onPlantClick: (Long) -> Unit) {
     val container = LocalAppContainer.current
     val viewModel: PlantListViewModel = viewModel(factory = PlantViewModelFactory(container))
-    val plants by viewModel.plants.collectAsStateWithLifecycle()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LazyColumn {
         item {
             ScreenColumn {
                 SectionTitle("Plants")
-                if (plants.isEmpty()) {
+                if (state.plants.isEmpty()) {
                     EmptyState("Add your first plant", "A plant only needs a name and watering interval.")
                 }
             }
         }
-        items(plants, key = { it.id }) { plant ->
+        items(state.plants, key = { it.id }) { plant ->
             ScreenColumn {
-                PlantCard(plant = plant, onClick = { onPlantClick(plant.id) })
+                PlantCard(
+                    plant = plant,
+                    latestPhoto = state.latestPhotos[plant.id],
+                    onClick = { onPlantClick(plant.id) }
+                )
             }
         }
     }

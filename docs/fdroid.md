@@ -10,7 +10,8 @@ Plants N Water is designed for F-Droid distribution.
 - No network dependency for core behavior.
 - Source license: MIT.
 - Gradle Kotlin DSL build.
-- Dependencies are open-source AndroidX/Kotlin libraries.
+- Dependencies are open-source AndroidX/Kotlin libraries plus Coil for image loading.
+- Coil is Apache-2.0 licensed, F-Droid compatible, and does not require Google Play Services or proprietary network services.
 
 ## Packaging Notes
 
@@ -25,5 +26,12 @@ Plants N Water is designed for F-Droid distribution.
 - `POST_NOTIFICATIONS`: Android 13+ reminder permission.
 - `SCHEDULE_EXACT_ALARM`: used only for local reminder timing where allowed.
 - `RECEIVE_BOOT_COMPLETED`: reschedules local reminders after reboot.
-- `CAMERA`: only needed when taking plant photos directly.
-- `READ_MEDIA_IMAGES`: only needed when adding images from gallery.
+- `CAMERA`: requested only when taking plant photos directly.
+- Gallery image selection uses the Android photo picker, so broad image/media storage permission is not requested.
+
+## Photo Storage
+
+- Plant photos are stored in app-private `files/plant-photos`.
+- The Room database stores generated internal photo references and metadata, not public file paths.
+- Photos are local-only and are included in the documented backup/export media folder when export support is implemented.
+- The app does not upload photos, extract location metadata, run analytics, or depend on proprietary SDKs.

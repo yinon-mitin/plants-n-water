@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -15,8 +17,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import dev.yinon.plantsnwater.data.local.PlantEntity
+import dev.yinon.plantsnwater.data.local.PlantPhotoEntity
+import dev.yinon.plantsnwater.ui.LocalAppContainer
 import dev.yinon.plantsnwater.ui.wateringLabel
 import java.time.Instant
 import java.time.ZoneId
@@ -54,6 +61,7 @@ fun EmptyState(title: String, body: String) {
 @Composable
 fun PlantCard(
     plant: PlantEntity,
+    latestPhoto: PlantPhotoEntity? = null,
     onClick: () -> Unit,
     onWatered: (() -> Unit)? = null,
     onSkip: (() -> Unit)? = null,
@@ -62,10 +70,16 @@ fun PlantCard(
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column(Modifier.weight(1f)) {
-                    Text(plant.name, style = MaterialTheme.typography.titleMedium)
-                    val subtitle = listOfNotNull(plant.species, plant.location).joinToString(" · ")
-                    if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodyMedium)
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    latestPhoto?.let { PlantThumbnail(plant.name, it) }
+                    Column {
+                        Text(plant.name, style = MaterialTheme.typography.titleMedium)
+                        val subtitle = listOfNotNull(plant.species, plant.location).joinToString(" · ")
+                        if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
                 AssistChip(onClick = {}, label = { Text(plant.wateringLabel()) })
             }
@@ -80,6 +94,19 @@ fun PlantCard(
             }
         }
     }
+}
+
+@Composable
+private fun PlantThumbnail(plantName: String, photo: PlantPhotoEntity) {
+    val container = LocalAppContainer.current
+    AsyncImage(
+        model = container.plantRepository.photoUri(photo),
+        contentDescription = "Latest photo of $plantName",
+        modifier = Modifier
+            .size(56.dp)
+            .clip(RoundedCornerShape(8.dp)),
+        contentScale = ContentScale.Crop
+    )
 }
 
 fun Long.formatDate(): String = Instant.ofEpochMilli(this)

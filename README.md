@@ -4,12 +4,15 @@ Plants N Water is a lightweight, local-first Android app for tracking plants, wa
 
 ## Project Status
 
-This repository contains the initial serious open-source Android implementation. Version `0.1.0` focuses on the offline data model, Compose UI scaffolding, plant management, watering history, reminder scheduling infrastructure, settings, and documented backup format.
+This repository contains the initial serious open-source Android implementation. Version `0.1.0` focuses on the offline data model, Compose UI scaffolding, plant management, growth photo history, watering history, reminder scheduling infrastructure, settings, and documented backup format.
 
 ## Features
 
 - Fast plant creation with only a name and watering interval required
 - Plant list, today view, detail screen, calendar-style schedule, photo timeline, settings, and import/export screens
+- Plant photo capture from camera and image selection from the Android photo picker
+- Chronological photo timeline with optional notes, dates, and flexible growth stage labels
+- Latest plant photo thumbnails in plant cards
 - Room-backed local storage for plants, watering events, notes, photos, and tags
 - Watering schedule calculation with overdue/upcoming state
 - Mark as watered, skip, postpone, archive, and delete flows at the architecture level
@@ -62,13 +65,16 @@ Plants N Water is local-first and privacy-friendly:
 - No hidden network calls
 - No cloud sync by default
 - Photos and plant data stay on the device unless the user explicitly exports them
-- Permissions are requested only for notifications, camera, and image access when those features are used
+- Plant photos are copied into app-private storage and are never uploaded
+- Camera permission is requested only when taking a new photo
+- Gallery selection uses the Android photo picker and does not require broad media/storage permission
+- EXIF/location extraction is not performed
 
 ## F-Droid Compatibility
 
 The app is designed for F-Droid:
 
-- Kotlin, Jetpack Compose, Room, DataStore, WorkManager, and AndroidX only
+- Kotlin, Jetpack Compose, Room, DataStore, WorkManager, Coil, and AndroidX only
 - No Firebase
 - No Google Play Services
 - No proprietary tracking or monetization SDKs
@@ -85,6 +91,7 @@ See `docs/fdroid.md` for packaging notes.
 - Material 3
 - Room
 - DataStore
+- Coil Compose for lightweight local image thumbnail loading
 - AlarmManager and WorkManager-compatible scheduling boundaries
 - Coroutines and Flow
 - MVVM with small repositories and testable domain logic
